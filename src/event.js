@@ -53,7 +53,10 @@ chrome.runtime.onMessage.addListener(function(message,sender,sendResponse){
 		});
 	}
 	else if (message.type=='dataslayer_pageload'||message.type=='dataslayer_opened'){
-		chrome.tabs.executeScript(message.tabID,{ file: 'content.js', runAt: 'document_idle', allFrames: true });
+		console.log('pageload');
+		setTimeout(function() {
+			chrome.tabs.executeScript(message.tabID,{ file: 'content.js', runAt: 'document_start', allFrames: true });
+		}, 500);
 	}
 	else if (message.type=='dataslayer_refresh'){
 		chrome.tabs.sendMessage(message.tabID,{ask: 'refresh'});

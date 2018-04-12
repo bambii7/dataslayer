@@ -28,6 +28,7 @@ dataslayer.options = {
   showArrayIndices: false
 };
 
+postData = {};
 
 try{
   if (typeof localStorage.options !== 'undefined') dataslayer.options = JSON.parse(localStorage.options);
@@ -973,7 +974,8 @@ function newRequest(request){
     requestURI = (reqType=='floodlight') ? request.request.url : request.request.url.split('?')[1];
   }
   else if (request.request.method=='POST') {
-    requestURI = request.request.postData.text;
+    requestURI = postData[request.requestId];
+    // requestURI = request.request.postData.text;
   }
 
   // parse query string into key/value pairs
@@ -1097,8 +1099,40 @@ chrome.devtools.network.getHAR(function(harlog){
   });
 
 
-chrome.devtools.network.onNavigated.addListener(newPageLoad);
-chrome.devtools.network.onRequestFinished.addListener(newRequest);
+// buggy in M65
+// chrome.devtools.network.onNavigated.addListener(newPageLoad);
+// chrome.devtools.network.onRequestFinished.addListener(newRequest);
+
+// replaced with webRequest
+
+chrome.webRequest.onSendHeaders.addListener(function(info) {
+  newPageLoad(info.url);
+}, { urls: ["http://*/*", "https://*/*"], types: ['main_frame'], tabId: chrome.devtools.inspectedWindow.tabId });
+
+chrome.webRequest.onBeforeRequest.addListener(function(info) {
+  if (info.method === 'POST') {
+    try {
+      var enc = new TextDecoder("utf-8");
+      postData[info.requestId] = enc.decode(info.requestBody.raw[0].bytes);
+      console.log(postData);
+    } catch(e) {
+      console.log(e, info);
+    }
+  }
+}, { urls: ["http://*/*", "https://*/*"], tabId: chrome.devtools.inspectedWindow.tabId }, ['requestBody'])
+
+chrome.webRequest.onCompleted.addListener(function(info) {
+  newRequest({
+    requestId: info.requestId,
+    request: {
+      url: info.url,
+      method: info.method
+    },
+    response: {
+      status: info.statusCode
+    }
+  });
+}, { urls: ["http://*/*", "https://*/*"], tabId: chrome.devtools.inspectedWindow.tabId });
 
 dataslayer.port.onMessage.addListener(messageListener);
 
